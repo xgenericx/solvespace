@@ -1,6 +1,52 @@
 Changelog
 =========
 
+3.x  - since the 3.0 release, only available in edge builds
+---
+
+Constraints:
+
+* Arcs length ratio and difference.
+* Arc & Line length ratio and difference.
+* Allow comments to be associated with point entities.
+
+Sketching:
+
+* Support for pan, zoom and rotate trackpad gestures on macOS
+* Add "exploded view" to sketches via "\\" key. Shows sketch elements separated
+  by a configurable distance perpendicular to the sketch plane.
+* Added Feet-Inches as a unit of measure. Inputs are still in inches.
+  But the display shows feet, inches, and fraction of an inch.
+* Added an optional "pitch" parameter to helix extrusions (in the text window)
+* Allow use of Point & Normal to define "sketch-in-new-workplane".
+* Update "Property Browser" live while dragging the sketch.
+
+MISC:
+
+* Add a link to the GitHub commit from which SolveSpace was built in the Help
+  menu.
+* Make all points, vectors and normals shown in the Property Browser into
+  active links. This makes them explorable and selectable.
+* Load 16bit PNG images correctly by re-scaling to 8bit.
+* Fixed hang when trying to display characters missing from the embedded font.
+* The main window vertical size can be as small as the toolbar.
+* Configurable "SafeHeight" parameter instead of the fixed 5mm for G-code export.
+* Add Spanish / Argentina translation.
+* Move "perspective factor", "lighting direction" and "explode distance" from
+  the "configuration" screen to the "view" screen.
+* Add a "∆" suffix to groups which have "force to triangle mesh" ticked
+* Gray the group name in the text window for groups with suppressed solid model.
+* Added the ability to Link STL files.
+* When linking circuit boards (IDF .emn files) show keepout regions as construction entities.
+
+Performance:
+
+* Speed up sketches with many constraints by roughly 8x by using the Eigen
+  library in the solver. The maximum unknowns increased from 1024 to 2048.
+* Add a "suppress dof calculation" setting to groups - increases performance for
+  complex sketches.
+* More changes to the ID list implementation.
+
 3.0
 ---
 

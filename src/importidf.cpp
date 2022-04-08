@@ -54,7 +54,7 @@ static std::vector <std::string> splitString(const std::string line) {
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// Functions for linking an IDF file - we need to create entites that
+// Functions for linking an IDF file - we need to create entities that
 // get remapped into a linked group similar to linking .slvs files
 //////////////////////////////////////////////////////////////////////////////
 
@@ -291,9 +291,9 @@ static void MakeBeziersForArcs(SBezierList *sbl, Vector center, Vector pa, Vecto
 namespace SolveSpace {
 
 // Here we read the important section of an IDF file. SolveSpace Entities are directly created by
-// the funcions above, which is only OK because of the way linking works. For example points do
+// the functions above, which is only OK because of the way linking works. For example points do
 // not have handles for solver parameters (coordinates), they only have their actPoint values
-// set (or actNormal or actDistance). These are incompete entites and would be a problem if
+// set (or actNormal or actDistance). These are incomplete entities and would be a problem if
 // they were part of the sketch, but they are not. After making a list of them here, a new group
 // gets created from copies of these. Those copies are complete and part of the sketch group.
 bool LinkIDF(const Platform::Path &filename, EntityList *el, SMesh *m, SShell *sh) {
@@ -332,8 +332,9 @@ bool LinkIDF(const Platform::Path &filename, EntityList *el, SMesh *m, SShell *s
     
     double board_thickness = 10.0;
     double scale = 1.0; //mm
-    bool topEntities, bottomEntities;
-    
+    bool topEntities       = false;
+    bool bottomEntities    = false;
+
     Quaternion normal = Quaternion::From(Vector::From(1,0,0), Vector::From(0,1,0));
     hEntity hnorm = newNormal(el, &entityCount, normal);
 

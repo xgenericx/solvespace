@@ -710,7 +710,9 @@ bool SolveSpaceUI::LoadEntitiesFromFile(const Platform::Path &filename, EntityLi
                                         SMesh *m, SShell *sh)
 {
     if(strcmp(filename.Extension().c_str(), "emn")==0) {
-        return LinkIDF(filename, le, m, sh);    
+        return LinkIDF(filename, le, m, sh);
+    } else if(strcmp(filename.Extension().c_str(), "stl")==0) {
+        return LinkStl(filename, le, m, sh);    
     } else {
         return LoadEntitiesFromSlvs(filename, le, m, sh);
     }
@@ -907,6 +909,8 @@ try_again:
                     return false;
                 }
             }
+            if(g.IsTriangleMeshAssembly())
+                g.forceToMesh = true;
         } else if(linkMap.count(g.linkFile) == 0) {
             dbp("Missing file for group: %s", g.name.c_str());
             // The file was moved; prompt the user for its new location.

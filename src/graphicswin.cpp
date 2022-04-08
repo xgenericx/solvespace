@@ -94,10 +94,12 @@ const MenuEntry Menu[] = {
 { 1, N_("Show Snap &Grid"),             Command::SHOW_GRID,        '>',     KC, mView  },
 { 1, N_("Darken Inactive Solids"),      Command::DIM_SOLID_MODEL,  0,       KC, mView  },
 { 1, N_("Use &Perspective Projection"), Command::PERSPECTIVE_PROJ, '`',     KC, mView  },
+{ 1, N_("Show E&xploded View"),         Command::EXPLODE_SKETCH,   '\\',    KC, mView  },
 { 1, N_("Dimension &Units"),            Command::NONE,             0,       KN, NULL  },
 { 2, N_("Dimensions in &Millimeters"),  Command::UNITS_MM,         0,       KR, mView },
 { 2, N_("Dimensions in M&eters"),       Command::UNITS_METERS,     0,       KR, mView },
 { 2, N_("Dimensions in &Inches"),       Command::UNITS_INCHES,     0,       KR, mView },
+{ 2, N_("Dimensions in &Feet and Inches"), Command::UNITS_FEET_INCHES, 0,   KR, mView },
 { 1,  NULL,                             Command::NONE,             0,       KN, NULL   },
 { 1, N_("Show &Toolbar"),               Command::SHOW_TOOLBAR,     0,       KC, mView  },
 { 1, N_("Show Property Bro&wser"),      Command::SHOW_TEXT_WND,    '\t',    KC, mView  },
@@ -181,6 +183,7 @@ const MenuEntry Menu[] = {
 { 0, N_("&Help"),                       Command::NONE,             0,       KN, mHelp  },
 { 1, N_("&Language"),                   Command::LOCALE,           0,       KN, mHelp  },
 { 1, N_("&Website / Manual"),           Command::WEBSITE,          0,       KN, mHelp  },
+{ 1, N_("&Go to GitHub commit"),        Command::GITHUB,            0,       KN, mHelp  },
 #ifndef __APPLE__
 { 1, N_("&About"),                      Command::ABOUT,            0,       KN, mHelp  },
 #endif
@@ -317,6 +320,8 @@ void GraphicsWindow::PopulateMainMenu() {
                 dimSolidModelMenuItem = menuItem;
             } else if(Menu[i].cmd == Command::PERSPECTIVE_PROJ) {
                 perspectiveProjMenuItem = menuItem;
+            } else if(Menu[i].cmd == Command::EXPLODE_SKETCH) {
+                explodeMenuItem = menuItem;
             } else if(Menu[i].cmd == Command::SHOW_TOOLBAR) {
                 showToolbarMenuItem = menuItem;
             } else if(Menu[i].cmd == Command::SHOW_TEXT_WND) {
@@ -329,6 +334,8 @@ void GraphicsWindow::PopulateMainMenu() {
                 unitsMetersMenuItem = menuItem;
             } else if(Menu[i].cmd == Command::UNITS_INCHES) {
                 unitsInchesMenuItem = menuItem;
+            } else if(Menu[i].cmd == Command::UNITS_FEET_INCHES) {
+                unitsFeetInchesMenuItem = menuItem;
             } else if(Menu[i].cmd == Command::SEL_WORKPLANE) {
                 inWorkplaneMenuItem = menuItem;
             } else if(Menu[i].cmd == Command::FREE_IN_3D) {
@@ -370,7 +377,7 @@ static void PopulateMenuWithPathnames(Platform::MenuRef menu,
 void GraphicsWindow::PopulateRecentFiles() {
     PopulateMenuWithPathnames(openRecentMenu, SS.recentFiles, [](const Platform::Path &path) {
         // OkayToStartNewFile could mutate recentFiles, which will invalidate path (which is a
-        // refererence into the recentFiles vector), so take a copy of it here.
+        // reference into the recentFiles vector), so take a copy of it here.
         Platform::Path pathCopy(path);
         if(!SS.OkayToStartNewFile()) return;
         SS.Load(pathCopy);
@@ -407,6 +414,8 @@ void GraphicsWindow::Init() {
     showEdges = true;
     showMesh = false;
     showOutlines = false;
+    showFacesDrawing = false;
+    showFacesNonDrawing = true;
     drawOccludedAs = DrawOccludedAs::INVISIBLE;
 
     showTextWindow = true;
@@ -422,7 +431,7 @@ void GraphicsWindow::Init() {
             using namespace std::placeholders;
             // Do this first, so that if it causes an onRender event we don't try to paint without
             // a canvas.
-            window->SetMinContentSize(720, 670);
+            window->SetMinContentSize(720, /*ToolbarDrawOrHitTest 636*/ 32 * 18 + 3 * 16 + 8 + 4);
             window->onClose = std::bind(&SolveSpaceUI::MenuFile, Command::EXIT);
             window->onRender = std::bind(&GraphicsWindow::Paint, this);
             window->onKeyboardEvent = std::bind(&GraphicsWindow::KeyboardEvent, this, _1);
@@ -703,16 +712,47 @@ double GraphicsWindow::ZoomToFit(const Camera &camera,
     return scale;
 }
 
+
+void GraphicsWindow::ZoomToMouse(double zoomMultiplyer) {
+    double offsetRight = offset.Dot(projRight);
+    double offsetUp    = offset.Dot(projUp);
+
+    double width, height;
+    window->GetContentSize(&width, &height);
+
+    double righti = currentMousePosition.x / scale - offsetRight;
+    double upi    = currentMousePosition.y / scale - offsetUp;
+
+    // zoomMultiplyer of 1 gives a default zoom factor of 1.2x: zoomMultiplyer * 1.2
+    // zoom = adjusted zoom negative zoomMultiplyer will zoom out, positive will zoom in
+    //
+
+    scale *= exp(0.1823216 * zoomMultiplyer); // ln(1.2) = 0.1823216
+
+    double rightf = currentMousePosition.x / scale - offsetRight;
+    double upf    = currentMousePosition.y / scale - offsetUp;
+
+    offset = offset.Plus(projRight.ScaledBy(rightf - righti));
+    offset = offset.Plus(projUp.ScaledBy(upf - upi));
+
+    if(SS.TW.shown.screen == TextWindow::Screen::EDIT_VIEW) {
+        if(havePainted) {
+            SS.ScheduleShowTW();
+        }
+    }
+    havePainted = false;
+    Invalidate();
+}
+
+
 void GraphicsWindow::MenuView(Command id) {
     switch(id) {
         case Command::ZOOM_IN:
-            SS.GW.scale *= 1.2;
-            SS.ScheduleShowTW();
+            SS.GW.ZoomToMouse(1);
             break;
 
         case Command::ZOOM_OUT:
-            SS.GW.scale /= 1.2;
-            SS.ScheduleShowTW();
+            SS.GW.ZoomToMouse(-1);
             break;
 
         case Command::ZOOM_TO_FIT:
@@ -746,6 +786,12 @@ void GraphicsWindow::MenuView(Command id) {
                         "factor in the configuration screen. A value around 0.3 "
                         "is typical."));
             }
+            break;
+
+        case Command::EXPLODE_SKETCH:
+            SS.explode = !SS.explode;
+            SS.GW.EnsureValidActives();
+            SS.MarkGroupDirty(SS.GW.activeGroup, true);
             break;
 
         case Command::ONTO_WORKPLANE:
@@ -841,6 +887,12 @@ void GraphicsWindow::MenuView(Command id) {
             SS.GW.EnsureValidActives();
             break;
 
+        case Command::UNITS_FEET_INCHES:
+            SS.viewUnits = Unit::FEET_INCHES;
+            SS.ScheduleShowTW();
+            SS.GW.EnsureValidActives();
+            break;
+
         case Command::UNITS_MM:
             SS.viewUnits = Unit::MM;
             SS.ScheduleShowTW();
@@ -923,6 +975,7 @@ void GraphicsWindow::EnsureValidActives() {
         case Unit::MM:
         case Unit::METERS:
         case Unit::INCHES:
+        case Unit::FEET_INCHES:
             break;
         default:
             SS.viewUnits = Unit::MM;
@@ -931,6 +984,7 @@ void GraphicsWindow::EnsureValidActives() {
     unitsMmMenuItem->SetActive(SS.viewUnits == Unit::MM);
     unitsMetersMenuItem->SetActive(SS.viewUnits == Unit::METERS);
     unitsInchesMenuItem->SetActive(SS.viewUnits == Unit::INCHES);
+    unitsFeetInchesMenuItem->SetActive(SS.viewUnits == Unit::FEET_INCHES);
 
     if(SS.TW.window) SS.TW.window->SetVisible(SS.GW.showTextWindow);
     showTextWndMenuItem->SetActive(SS.GW.showTextWindow);
@@ -938,6 +992,7 @@ void GraphicsWindow::EnsureValidActives() {
     showGridMenuItem->SetActive(SS.GW.showSnapGrid);
     dimSolidModelMenuItem->SetActive(SS.GW.dimSolidModel);
     perspectiveProjMenuItem->SetActive(SS.usePerspectiveProj);
+    explodeMenuItem->SetActive(SS.explode);
     showToolbarMenuItem->SetActive(SS.showToolbar);
     fullScreenMenuItem->SetActive(SS.GW.window->IsFullScreen());
 
@@ -1364,6 +1419,14 @@ void GraphicsWindow::ToggleBool(bool *v) {
     Group *g = SK.GetGroup(SS.GW.activeGroup);
     if(*v && (g->displayOutlines.l.IsEmpty() && (v == &showEdges || v == &showOutlines))) {
         SS.GenerateAll(SolveSpaceUI::Generate::UNTIL_ACTIVE);
+    }
+
+    if(v == &showFaces) {
+        if(g->type == Group::Type::DRAWING_WORKPLANE || g->type == Group::Type::DRAWING_3D) {
+            showFacesDrawing = showFaces;
+        } else {
+            showFacesNonDrawing = showFaces;
+        }
     }
 
     Invalidate(/*clearPersistent=*/true);
